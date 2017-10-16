@@ -1,5 +1,5 @@
 require 'csv'
-file = ARGV[0]
+file = File.read(ARGV[0])
 print file.superclass
 
 file_path = file.path
