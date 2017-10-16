@@ -1,3 +1,8 @@
+class String
+    def red;            "\e[31m#{self}\e[0m" end
+    def green;          "\e[32m#{self}\e[0m" end
+    def brown;          "\e[33m#{self}\e[0m" end 
+end
 require 'csv'
 require 'time'
 
@@ -59,12 +64,20 @@ students.each do |s|
                 res = `curl --form \"file=@#{test[:filePath]}\" #{s[:hurl]}#{req[:url]} 2>/dev/null -m #{ReqMaxTime}`;        
                 if(res != req[:response])
                     result = "0";
+                    break;
                 end
                 #s[:timeout] = res.start_with?("curl: (28)") ? "(request timeout)" : "asdfsadf";
             end
         end
         s[:done] = true;
-        printf "%s%02d %s %s\t%s\n", s[:klas], s[:number], s[:name].ljust(22), result, s[:late], s[:timeout]
+        row = sprintf "%s%02d %s %s\t%s\n", s[:klas], s[:number], s[:name].ljust(22), result, s[:late]
+        if result == "0"
+            printf row.red
+        elsif s[:late] != ""
+            printf row.brown
+        else 
+            printf row.green
+        end
         if students.all? {|t| t[:done] }
             exit
         end
