@@ -1,3 +1,6 @@
+require 'csv'
+require 'time'
+
 Tests = [
     {
         filePath: "./B_17_Martin_Datsev.csv",
@@ -22,7 +25,7 @@ Tests = [
     }
 ]
 
-require 'csv'
+DeadLine = DateTime.parse("10/10/2017 23:59:59");
 
 csv_text = File.read(ARGV[0])
 csv = CSV.parse(csv_text, :headers => true)
@@ -31,26 +34,42 @@ students = [];
 
 csv.each do |row|
     unless row[2].nil? && row[3].nil? && row[4].nil?
+        late = ((DateTime.parse(row[0]) - DeadLine)* 24 * 60 * 60).to_i;
         students.push({
+            late: late > 0 ? "(#{late} minutes late)" : "",
+            klas: row[1] =~ /[bBбБ]/ ? "B" : ( row[1] =~ /[aAаА]/ ? "A" : "?"),    
+            number: row[2],            
             name: row[3].to_s + " " + row[4].to_s,
-            klas: row[1] =~ /[bBбБ]/ ? "B" : ( row[1] =~ /[aAаА]/ ? "A" : "?"),
-            number: row[2],
-            hurl: row[5]
+            hurl: row[5],
+            done: false
         })
     end
 end
 
 students.sort_by! {|s| [s[:klas].to_s, s[:number].to_i] }
 
+ReqMaxTime = 99999;
+
+Thread.abort_on_exception=true
 students.each do |s|
-    result = "1";
-    Tests.each do |test| 
-        test[:requests].each do |req|
-            res = `curl --form \"file=@#{test[:filePath]}\" #{s[:hurl]}#{req[:url]} 2>/dev/null`;        
-            if(res != req[:response])
-                result = "0";
+    Thread.new do
+        result = "1"
+        Tests.each do |test| 
+            test[:requests].each do |req|
+                res = `curl --form \"file=@#{test[:filePath]}\" #{s[:hurl]}#{req[:url]} 2>/dev/null -m #{ReqMaxTime}`;        
+                if(res != req[:response])
+                    result = "0";
+                end
+                #s[:timeout] = res.start_with?("curl: (28)") ? "(request timeout)" : "asdfsadf";
             end
         end
+        s[:done] = true;
+        printf "%s%02d %s %s\t%s\n", s[:klas], s[:number], s[:name].ljust(22), result, s[:late], s[:timeout]
+        if students.all? {|t| t[:done] }
+            exit
+        end
+        printf students.select{|t| t[:done]}.size.to_s + "/" + students.size.to_s + "\r";
     end
-    printf "#{s[:klas]}%02d #{s[:name].ljust(22)} #{result}\n" % s[:number]
 end
+
+sleep
